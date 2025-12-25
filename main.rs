@@ -1,9 +1,9 @@
 mod gui;
 mod simulation;
 mod structs;
-mod report; // for export_pdf  
+mod report; 
 
-use eframe::egui;          // for sharpness ı add ıt 
+use eframe::egui;
 use crate::gui::DLSApp;
 
 fn main() -> eframe::Result<()> {
