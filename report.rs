@@ -19,18 +19,14 @@ pub fn export_pdf(
     params: &SimulationParams,
     result: &DLSResult,
 ) -> anyhow::Result<()> {
-    // 1) Font ailesini diskteki tek TTF dosyasından yükle
-    //
-    // Proje kökünde şu dosya VAR:
-    //   C:\Users\ASUS\Desktop\dls_simulation_tool\DejaVuSans-Regular.ttf
-    //
-    // O yüzden base_name olarak "DejaVuSans-Regular" kullanıyoruz ki
-    // genpdf doğrudan bu dosyayı kullansın. [web:146][web:101]
+    let fonts_dir  = std::path
+        ::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("font");
+
     let font_family =
-        genpdf::fonts::from_files(".", "DejaVuSans-Regular", None)
+        genpdf::fonts::from_files(&fonts_dir, "MonaspaceXenonFrozen", None)
             .expect("Failed to load font family");
 
-    // 2) Document'i bu default font ailesiyle oluştur
     let mut doc = genpdf::Document::new(font_family);
     doc.set_title("DLS Simulation Report");
 
@@ -38,14 +34,12 @@ pub fn export_pdf(
     decorator.set_margins(20);
     doc.set_page_decorator(decorator);
 
-    // BAŞLIK
     let heading = elements::Paragraph::new("Dynamic Light Scattering Simulation")
         .aligned(Alignment::Center)
         .styled(style::Style::new().bold().with_font_size(18));
     doc.push(heading);
     doc.push(elements::Break::new(1));
 
-    // PARAMETRELER
     doc.push(
         elements::Paragraph::new("Simulation Parameters")
             .styled(style::Style::new().bold().with_font_size(14)),
@@ -71,7 +65,6 @@ pub fn export_pdf(
     doc.push(table);
     doc.push(elements::Break::new(1));
 
-    // SONUÇLAR
     doc.push(
         elements::Paragraph::new("Results Summary")
             .styled(style::Style::new().bold().with_font_size(14)),
@@ -113,7 +106,6 @@ pub fn export_pdf(
 
     doc.push(table2);
 
-    // PDF'E YAZ
     let file = File::create(path)?;
     doc.render(file)?;
 
