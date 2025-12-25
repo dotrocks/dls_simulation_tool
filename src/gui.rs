@@ -1,3 +1,4 @@
+use crate::report::export_pdf;
 use crate::{
     simulation::simulate,
     structs::{DLSResult, SimulationParams},
@@ -34,14 +35,10 @@ impl DLSApp {
         let results = Arc::clone(&self.results);
 
         std::thread::spawn(move || {
-            let rt = tokio::runtime::Runtime::new().unwrap();
-            rt.block_on(async {
-                let simulation = simulate(params);
-                let result = simulation.await;
-                let mut results_lock = results.lock().unwrap();
-                *results_lock = Some(result);
-                ctx.request_repaint();
-            });
+            let result = simulate(params);
+            let mut results_lock = results.lock().unwrap();
+            *results_lock = Some(result);
+            ctx.request_repaint();
         });
     }
 }
@@ -248,6 +245,20 @@ impl eframe::App for DLSApp {
                             );
                             ui.end_row();
                         });
+
+                    ui.add_space(6.0);
+
+                    if ui
+                        .add_sized(
+                            [ui.available_width(), 24.0],
+                            egui::Button::new("Export PDF").small(),
+                        )
+                        .clicked()
+                    {
+                        if let Err(err) = export_pdf("dls_report.pdf", &self.params, results) {
+                            eprintln!("PDF export error: {err}");
+                        }
+                    }
                 } else {
                     ui.add_space(3.0);
                     ui.label(
@@ -284,7 +295,8 @@ impl eframe::App for DLSApp {
                             .x_axis_label("Time (s)")
                             .y_axis_label("Intensity (a.u.)")
                             .legend(
-                                egui_plot::Legend::default().position(egui_plot::Corner::RightTop),
+                                egui_plot::Legend::default()
+                                    .position(egui_plot::Corner::RightTop),
                             )
                             .show(ui, |plot_ui| {
                                 let n_show = 1000.min(results.time.len());
@@ -327,7 +339,8 @@ impl eframe::App for DLSApp {
                             .x_axis_label("log₁₀(τ) [s]")
                             .y_axis_label("g₁(τ)")
                             .legend(
-                                egui_plot::Legend::default().position(egui_plot::Corner::RightTop),
+                                egui_plot::Legend::default()
+                                    .position(egui_plot::Corner::RightTop),
                             )
                             .show(ui, |plot_ui| {
                                 let g1_sim: PlotPoints = results
@@ -377,7 +390,8 @@ impl eframe::App for DLSApp {
                             .x_axis_label("log₁₀(τ) [s]")
                             .y_axis_label("g₂(τ)")
                             .legend(
-                                egui_plot::Legend::default().position(egui_plot::Corner::RightTop),
+                                egui_plot::Legend::default()
+                                    .position(egui_plot::Corner::RightTop),
                             )
                             .show(ui, |plot_ui| {
                                 let g2_sim: PlotPoints = results
@@ -427,7 +441,8 @@ impl eframe::App for DLSApp {
                             .x_axis_label("Size (nm)")
                             .y_axis_label("Relative Intensity")
                             .legend(
-                                egui_plot::Legend::default().position(egui_plot::Corner::RightTop),
+                                egui_plot::Legend::default()
+                                    .position(egui_plot::Corner::RightTop),
                             )
                             .show(ui, |plot_ui| {
                                 let int_dist: PlotPoints = results

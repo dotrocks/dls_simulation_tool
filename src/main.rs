@@ -1,7 +1,9 @@
 mod gui;
 mod simulation;
 mod structs;
+mod report; 
 
+use eframe::egui;
 use crate::gui::DLSApp;
 
 fn main() -> eframe::Result<()> {

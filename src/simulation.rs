@@ -19,8 +19,14 @@ impl DLSSimulator {
     }
 
     pub fn simulate_dls(&mut self, params: SimulationParams) -> DLSResult {
-        let n_steps = (params.total_time / params.dt).ceil() as usize;
-        let time: Vec<f64> = (0..n_steps).map(|i| (i as f64) * params.dt).collect();
+    let mut n_steps = (params.total_time / params.dt).ceil() as usize;
+    let max_steps = 1_000_000;
+    if n_steps > max_steps {
+        n_steps = max_steps;
+    }
+    let effective_dt = params.total_time / n_steps as f64;
+    let time: Vec<f64> = (0..n_steps).map(|i| (i as f64) * effective_dt).collect();
+
 
         let t = params.temperature_c + 273.15;
         let eta = params.viscosity_mpa_s * 1e-3;
@@ -28,13 +34,10 @@ impl DLSSimulator {
         let n_medium = 1.33;
         let theta = params.scattering_angle_deg.to_radians();
         let q = (4.0 * PI * n_medium / wavelength_m) * (theta / 2.0).sin();
+        let cv = (params.std_size_nm / params.mean_size_nm).max(0.01);
+        let log_std = (1.0 + cv.powi(2)).ln().sqrt();
+        let log_mean = (params.mean_size_nm / (1.0 + cv.powi(2)).sqrt()).ln();
 
-        let log_mean = (params.mean_size_nm.powi(2)
-            / (params.std_size_nm.powi(2) + params.mean_size_nm.powi(2)).sqrt())
-        .ln();
-        let log_std = (1.0 + (params.std_size_nm / params.mean_size_nm).powi(2))
-            .ln()
-            .sqrt();
 
         let log_normal = LogNormal::new(log_mean, log_std).unwrap();
         let sizes_nm: Vec<f64> = (0..params.n_particles)
@@ -66,7 +69,7 @@ impl DLSSimulator {
 
             for j in 0..n_steps {
                 let normal_rv = self.normal_dist.sample(&mut self.rng);
-                let dw = normal_rv * params.dt.sqrt();
+                let dw = normal_rv * effective_dt.sqrt();
                 phi = phi + sqrt_2_gamma * dw;
                 e_total[j] = e_total[j] + intensity_weights[i] * phi.cos();
             }
@@ -86,13 +89,15 @@ impl DLSSimulator {
                 self.normal_dist.sample(&mut self.rng) * params.detector_noise_level * i_mean;
             intensity = intensity + detector_noise;
 
-            let dark_noise = self.sample_poisson(params.dark_count_rate * params.dt);
-            intensity =
-                intensity + (dark_noise - params.dark_count_rate * params.dt) * i_mean / 1000.0;
+            let dark_noise = self.sample_poisson(params.dark_count_rate * effective_dt);
+            intensity += (dark_noise - params.dark_count_rate * effective_dt) * i_mean / 1000.0;
+
 
             let time_hours = t_val / 3600.0;
-            let baseline_drift = 0.01 * i_mean * (2.0 * PI * 0.1 * time_hours).sin();
-            i_final[j] = (intensity + baseline_drift).max(0.1 * i_mean);
+            let drift_coeff = 0.001;
+            let baseline_drift = drift_coeff * i_mean * time_hours;
+            i_final[j] = (intensity + baseline_drift).max(0.0);
+
         }
 
         let noise_signal: Vec<f64> = i_final
@@ -112,15 +117,18 @@ impl DLSSimulator {
         let e_mean = e_total.iter().sum::<f64>() / (e_total.len() as f64);
         let e_fluct: Vec<f64> = e_total.iter().map(|e| e - e_mean).collect();
 
+        // Field fluctuation → g1
         let g1_numeric_ideal = Self::compute_autocorr(&e_fluct, max_lag);
-        let i_fluct: Vec<f64> = i_final.iter().map(|i| i - i_mean).collect();
-        let mut g2_numeric_noisy = Self::compute_autocorr(&i_fluct, max_lag);
 
-        for val in g2_numeric_noisy.iter_mut() {
-            *val = 1.0 + params.beta * (*val);
-        }
+        // Siegert relation: g2 = 1 + β |g1|²
+        let g2_numeric_noisy: Vec<f64> = g1_numeric_ideal
+            .iter()
+            .map(|g1| 1.0 + params.beta * g1.powi(2))
+            .collect();
 
-        let tau: Vec<f64> = (0..max_lag).map(|i| (i as f64) * params.dt).collect();
+
+        let tau: Vec<f64> = (0..max_lag).map(|i| (i as f64) * effective_dt).collect();
+
 
         let mut g1_theory = vec![0.0; max_lag];
         for (lag_idx, tau_val) in tau.iter().enumerate() {
@@ -207,24 +215,27 @@ impl DLSSimulator {
     }
 
     fn compute_autocorr(data: &[f64], max_lag: usize) -> Vec<f64> {
+        let n = data.len();
+        let mean = data.iter().sum::<f64>() / n as f64;
+        let centered: Vec<f64> = data.iter().map(|x| x - mean).collect();
+
+        let var = centered
+            .iter()
+            .map(|x| x * x)
+            .sum::<f64>() / n as f64;
+
         let mut result = vec![0.0; max_lag];
-        for lag in 0..max_lag {
-            if lag < data.len() {
-                let mut sum = 0.0;
-                for i in 0..(data.len() - lag) {
-                    sum = sum + data[i + lag] * data[i];
-                }
-                result[lag] = sum / ((data.len() - lag) as f64);
+        for lag in 0..max_lag.min(n) {
+            let mut sum = 0.0;
+            for i in 0..(n - lag) {
+                sum += centered[i] * centered[i + lag];
             }
-        }
-        if result[0] != 0.0 {
-            let norm = result[0];
-            for val in result.iter_mut() {
-                *val = *val / norm;
-            }
+            // normalize by N and variance → g(0)=1
+            result[lag] = sum / (n as f64 * var);
         }
         result
     }
+
 
     fn weighted_stats(data: &[f64], weights: &[f64]) -> (f64, f64) {
         let sum_w: f64 = weights.iter().sum();
@@ -287,8 +298,7 @@ impl DLSSimulator {
     }
 }
 
-pub async fn simulate(params: SimulationParams) -> DLSResult {
+pub fn simulate(params: SimulationParams) -> DLSResult {
     let mut simulator = DLSSimulator::new();
-    let result = simulator.simulate_dls(params);
-    result
+    simulator.simulate_dls(params)
 }
