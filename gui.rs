@@ -34,7 +34,6 @@ impl DLSApp {
         let ctx = ctx.clone();
         let results = Arc::clone(&self.results);
 
-        // CPU-bound simülasyon için arka plan thread'i
         std::thread::spawn(move || {
             let result = simulate(params);
             let mut results_lock = results.lock().unwrap();
@@ -46,7 +45,6 @@ impl DLSApp {
 
 impl eframe::App for DLSApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // Üst başlık
         egui::TopBottomPanel::top("header")
             .exact_height(70.0)
             .show(ctx, |ui| {
@@ -61,7 +59,6 @@ impl eframe::App for DLSApp {
                 });
             });
 
-        // Sol parametre paneli
         egui::SidePanel::left("params")
             .min_width(260.0)
             .max_width(260.0)
@@ -125,7 +122,7 @@ impl eframe::App for DLSApp {
                     );
 
                     ui.add(
-                        egui::Slider::new(&mut self.params.scattering_angle_deg, 30.0..=150.0)
+                        egui::Slider::new(&mut self.params.scattering_angle_deg, 30.0..=173.0)
                             .text("Angle (°)")
                             .custom_formatter(|n, _| format!("{:.0}", n)),
                     );
@@ -251,7 +248,6 @@ impl eframe::App for DLSApp {
 
                     ui.add_space(6.0);
 
-                    // PDF export butonu
                     if ui
                         .add_sized(
                             [ui.available_width(), 24.0],
@@ -274,7 +270,6 @@ impl eframe::App for DLSApp {
                 }
             });
 
-        // Merkez panel: grafikler
         egui::CentralPanel::default().show(ctx, |ui| {
             egui::ScrollArea::vertical().show(ui, |ui| {
                 ui.add_space(8.0);
@@ -285,7 +280,6 @@ impl eframe::App for DLSApp {
                     let plot_width = available_width - 20.0;
                     let plot_height = 220.0;
 
-                    // Intensity vs Time
                     ui.group(|ui| {
                         ui.label(
                             egui::RichText::new("SCATTERED INTENSITY vs TIME")
@@ -330,7 +324,6 @@ impl eframe::App for DLSApp {
 
                     ui.add_space(12.0);
 
-                    // g1(τ)
                     ui.group(|ui| {
                         ui.label(
                             egui::RichText::new("FIELD AUTOCORRELATION FUNCTION g₁(τ)")
@@ -382,7 +375,6 @@ impl eframe::App for DLSApp {
 
                     ui.add_space(12.0);
 
-                    // g2(τ)
                     ui.group(|ui| {
                         ui.label(
                             egui::RichText::new("INTENSITY AUTOCORRELATION FUNCTION g₂(τ)")
@@ -434,7 +426,6 @@ impl eframe::App for DLSApp {
 
                     ui.add_space(12.0);
 
-                    // Particle size distribution
                     ui.group(|ui| {
                         ui.label(
                             egui::RichText::new("PARTICLE SIZE DISTRIBUTION")
