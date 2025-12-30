@@ -21,7 +21,10 @@ pub fn export_pdf(
 ) -> anyhow::Result<()> {
     let fonts_dir  = std::path
         ::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("font");
+        .join("font")
+        .join("fonts")
+        .join("Frozen Fonts")
+        .join("Monaspace Xenon");
 
     let font_family =
         genpdf::fonts::from_files(&fonts_dir, "MonaspaceXenonFrozen", None)
