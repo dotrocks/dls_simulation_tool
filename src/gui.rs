@@ -122,7 +122,7 @@ impl eframe::App for DLSApp {
                     );
 
                     ui.add(
-                        egui::Slider::new(&mut self.params.scattering_angle_deg, 30.0..=150.0)
+                        egui::Slider::new(&mut self.params.scattering_angle_deg, 30.0..=173.0)
                             .text("Angle (°)")
                             .custom_formatter(|n, _| format!("{:.0}", n)),
                     );
