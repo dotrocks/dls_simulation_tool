@@ -1,6 +1,6 @@
 use crate::structs::{DLSResult, SimulationParams};
-use genpdf::{elements, style, Alignment};
 use genpdf::Element;
+use genpdf::{Alignment, elements, style};
 use std::fs::File;
 
 macro_rules! row {
@@ -14,21 +14,15 @@ macro_rules! row {
     }};
 }
 
-pub fn export_pdf(
-    path: &str,
-    params: &SimulationParams,
-    result: &DLSResult,
-) -> anyhow::Result<()> {
-    let fonts_dir  = std::path
-        ::Path::new(env!("CARGO_MANIFEST_DIR"))
+pub fn export_pdf(path: &str, params: &SimulationParams, result: &DLSResult) -> anyhow::Result<()> {
+    let fonts_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("font")
         .join("fonts")
         .join("Frozen Fonts")
         .join("Monaspace Xenon");
 
-    let font_family =
-        genpdf::fonts::from_files(&fonts_dir, "MonaspaceXenonFrozen", None)
-            .expect("Failed to load font family");
+    let font_family = genpdf::fonts::from_files(&fonts_dir, "MonaspaceXenonFrozen", None)
+        .expect("Failed to load font family");
 
     let mut doc = genpdf::Document::new(font_family);
     doc.set_title("DLS Simulation Report");
@@ -53,17 +47,49 @@ pub fn export_pdf(
 
     row!(table, "Total time (s)", format!("{:.4}", params.total_time));
     row!(table, "dt (s)", format!("{:.1e}", params.dt));
-    row!(table, "Mean size (nm)", format!("{:.1}", params.mean_size_nm));
+    row!(
+        table,
+        "Mean size (nm)",
+        format!("{:.1}", params.mean_size_nm)
+    );
     row!(table, "Std size (nm)", format!("{:.1}", params.std_size_nm));
     row!(table, "Particles", format!("{}", params.n_particles));
-    row!(table, "Temperature (°C)", format!("{:.1}", params.temperature_c));
-    row!(table, "Viscosity (mPa·s)", format!("{:.2}", params.viscosity_mpa_s));
-    row!(table, "Wavelength (nm)", format!("{:.0}", params.wavelength_nm));
-    row!(table, "Angle (°)", format!("{:.0}", params.scattering_angle_deg));
+    row!(
+        table,
+        "Temperature (°C)",
+        format!("{:.1}", params.temperature_c)
+    );
+    row!(
+        table,
+        "Viscosity (mPa·s)",
+        format!("{:.2}", params.viscosity_mpa_s)
+    );
+    row!(
+        table,
+        "Wavelength (nm)",
+        format!("{:.0}", params.wavelength_nm)
+    );
+    row!(
+        table,
+        "Angle (°)",
+        format!("{:.0}", params.scattering_angle_deg)
+    );
     row!(table, "Beta", format!("{:.2}", params.beta));
-    row!(table, "Shot noise", format!("{:.2}", params.shot_noise_level));
-    row!(table, "Detector noise", format!("{:.2}", params.detector_noise_level));
-    row!(table, "Dark count (cps)", format!("{:.0}", params.dark_count_rate));
+    row!(
+        table,
+        "Shot noise",
+        format!("{:.2}", params.shot_noise_level)
+    );
+    row!(
+        table,
+        "Detector noise",
+        format!("{:.2}", params.detector_noise_level)
+    );
+    row!(
+        table,
+        "Dark count (cps)",
+        format!("{:.0}", params.dark_count_rate)
+    );
 
     doc.push(table);
     doc.push(elements::Break::new(1));
