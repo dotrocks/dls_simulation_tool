@@ -1,6 +1,7 @@
 use crate::structs::{DLSResult, SimulationParams};
 use genpdf::Element;
 use genpdf::{Alignment, elements, style};
+use opener;
 use plotters::prelude::*;
 use std::fs::File;
 use std::path::Path;
@@ -177,11 +178,13 @@ pub fn export_pdf(path: &str, params: &SimulationParams, result: &DLSResult) -> 
     let file = File::create(path)?;
     doc.render(file)?;
 
+    opener::open(path)?;
+
     Ok(())
 }
 
 fn generate_g1_plot(path: &Path, result: &DLSResult) -> anyhow::Result<()> {
-    let root = BitMapBackend::new(path, (1600, 800)).into_drawing_area();
+    let root = BitMapBackend::new(path, (2000, 1000)).into_drawing_area();
     root.fill(&WHITE)?;
 
     let data_sim: Vec<(f64, f64)> = result
@@ -241,6 +244,7 @@ fn generate_g1_plot(path: &Path, result: &DLSResult) -> anyhow::Result<()> {
         .configure_mesh()
         .x_desc("log10(T) [s]")
         .y_desc("g_1(T)")
+        .label_style(("sans-serif", 32))
         .draw()?;
 
     chart
@@ -263,7 +267,7 @@ fn generate_g1_plot(path: &Path, result: &DLSResult) -> anyhow::Result<()> {
 }
 
 fn generate_g2_plot(path: &Path, result: &DLSResult) -> anyhow::Result<()> {
-    let root = BitMapBackend::new(path, (1600, 800)).into_drawing_area();
+    let root = BitMapBackend::new(path, (2000, 1000)).into_drawing_area();
     root.fill(&WHITE)?;
 
     let data_sim: Vec<(f64, f64)> = result
@@ -326,6 +330,7 @@ fn generate_g2_plot(path: &Path, result: &DLSResult) -> anyhow::Result<()> {
         .configure_mesh()
         .x_desc("log10(T) [s]")
         .y_desc("g_2(T)")
+        .label_style(("sans-serif", 32))
         .draw()?;
 
     chart
@@ -348,7 +353,7 @@ fn generate_g2_plot(path: &Path, result: &DLSResult) -> anyhow::Result<()> {
 }
 
 fn generate_size_plot(path: &Path, result: &DLSResult) -> anyhow::Result<()> {
-    let root = BitMapBackend::new(path, (1600, 800)).into_drawing_area();
+    let root = BitMapBackend::new(path, (2000, 1000)).into_drawing_area();
     root.fill(&WHITE)?;
 
     let min_x = result
@@ -411,6 +416,7 @@ fn generate_size_plot(path: &Path, result: &DLSResult) -> anyhow::Result<()> {
         .configure_mesh()
         .x_desc("Size (nm)")
         .y_desc("Relative Distribution")
+        .label_style(("sans-serif", 32))
         .draw()?;
 
     chart
