@@ -235,9 +235,9 @@ fn generate_g1_plot(path: &Path, result: &DLSResult) -> anyhow::Result<()> {
 
     let mut chart = ChartBuilder::on(&root)
         .caption("Field Autocorrelation Function g_1(T)", ("sans-serif", 64))
-        .margin(5)
-        .x_label_area_size(40)
-        .y_label_area_size(50)
+        .margin(10)
+        .x_label_area_size(80)
+        .y_label_area_size(100)
         .build_cartesian_2d(min_x..max_x, min_y..max_y)?;
 
     chart
@@ -321,9 +321,9 @@ fn generate_g2_plot(path: &Path, result: &DLSResult) -> anyhow::Result<()> {
             "Intensity Autocorrelation Function g_2(T)",
             ("sans-serif", 64),
         )
-        .margin(5)
-        .x_label_area_size(40)
-        .y_label_area_size(50)
+        .margin(10)
+        .x_label_area_size(80)
+        .y_label_area_size(100)
         .build_cartesian_2d(min_x..max_x, min_y..max_y)?;
 
     chart
@@ -407,9 +407,9 @@ fn generate_size_plot(path: &Path, result: &DLSResult) -> anyhow::Result<()> {
 
     let mut chart = ChartBuilder::on(&root)
         .caption("Particle Size Distribution", ("sans-serif", 64))
-        .margin(5)
-        .x_label_area_size(40)
-        .y_label_area_size(50)
+        .margin(10)
+        .x_label_area_size(80)
+        .y_label_area_size(100)
         .build_cartesian_2d(min_x..max_x, min_y..max_y)?;
 
     chart
