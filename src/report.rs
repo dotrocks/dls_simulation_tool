@@ -1,7 +1,10 @@
 use crate::structs::{DLSResult, SimulationParams};
 use genpdf::Element;
 use genpdf::{Alignment, elements, style};
+use plotters::prelude::*;
 use std::fs::File;
+use std::path::Path;
+use tempfile::NamedTempFile;
 
 macro_rules! row {
     ($table:ident, $label:expr, $value:expr) => {{
@@ -135,8 +138,311 @@ pub fn export_pdf(path: &str, params: &SimulationParams, result: &DLSResult) -> 
 
     doc.push(table2);
 
+    doc.push(elements::PageBreak::new());
+
+    doc.push(
+        elements::Paragraph::new("Plots").styled(style::Style::new().bold().with_font_size(14)),
+    );
+    doc.push(elements::Break::new(0.5));
+
+    if let Ok(temp_file) = NamedTempFile::new() {
+        let image_path = temp_file.path().with_extension("png");
+        if generate_g1_plot(&image_path, result).is_ok() {
+            if let Ok(img) = elements::Image::from_path(&image_path) {
+                doc.push(img.with_alignment(Alignment::Center));
+            }
+        }
+    }
+    doc.push(elements::Break::new(0.5));
+
+    if let Ok(temp_file) = NamedTempFile::new() {
+        let image_path = temp_file.path().with_extension("png");
+        if generate_g2_plot(&image_path, result).is_ok() {
+            if let Ok(img) = elements::Image::from_path(&image_path) {
+                doc.push(img.with_alignment(Alignment::Center));
+            }
+        }
+    }
+    doc.push(elements::Break::new(0.5));
+
+    if let Ok(temp_file) = NamedTempFile::new() {
+        let image_path = temp_file.path().with_extension("png");
+        if generate_size_plot(&image_path, result).is_ok() {
+            if let Ok(img) = elements::Image::from_path(&image_path) {
+                doc.push(img.with_alignment(Alignment::Center));
+            }
+        }
+    }
+
     let file = File::create(path)?;
     doc.render(file)?;
 
+    Ok(())
+}
+
+fn generate_g1_plot(path: &Path, result: &DLSResult) -> anyhow::Result<()> {
+    let root = BitMapBackend::new(path, (1600, 800)).into_drawing_area();
+    root.fill(&WHITE)?;
+
+    let data_sim: Vec<(f64, f64)> = result
+        .tau
+        .iter()
+        .zip(&result.g1_numeric_ideal)
+        .filter(|(tau, _)| **tau > 1e-10)
+        .map(|(tau, g1)| (tau.log10(), *g1))
+        .collect();
+    let data_theory: Vec<(f64, f64)> = result
+        .tau_theory
+        .iter()
+        .zip(&result.g1_theory)
+        .filter(|(tau, _)| **tau > 1e-10)
+        .map(|(tau, g1)| (tau.log10(), *g1))
+        .collect();
+
+    let min_x = data_sim
+        .iter()
+        .map(|&(x, _)| x)
+        .fold(f64::INFINITY, f64::min)
+        .min(
+            data_theory
+                .iter()
+                .map(|&(x, _)| x)
+                .fold(f64::INFINITY, f64::min),
+        );
+    let max_x = data_sim
+        .iter()
+        .map(|&(x, _)| x)
+        .fold(f64::NEG_INFINITY, f64::max)
+        .max(
+            data_theory
+                .iter()
+                .map(|&(x, _)| x)
+                .fold(f64::NEG_INFINITY, f64::max),
+        );
+    let min_y = data_sim
+        .iter()
+        .chain(&data_theory)
+        .map(|&(_, y)| y)
+        .fold(f64::INFINITY, f64::min);
+    let max_y = data_sim
+        .iter()
+        .chain(&data_theory)
+        .map(|&(_, y)| y)
+        .fold(f64::NEG_INFINITY, f64::max);
+
+    let mut chart = ChartBuilder::on(&root)
+        .caption("Field Autocorrelation Function g_1(T)", ("sans-serif", 64))
+        .margin(5)
+        .x_label_area_size(40)
+        .y_label_area_size(50)
+        .build_cartesian_2d(min_x..max_x, min_y..max_y)?;
+
+    chart
+        .configure_mesh()
+        .x_desc("log10(T) [s]")
+        .y_desc("g_1(T)")
+        .draw()?;
+
+    chart
+        .draw_series(LineSeries::new(data_sim, RED.stroke_width(4)))?
+        .label("Simulated")
+        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], &RED));
+    chart
+        .draw_series(LineSeries::new(data_theory, GREEN.stroke_width(4)))?
+        .label("Theoretical")
+        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], &GREEN));
+
+    chart
+        .configure_series_labels()
+        .background_style(&WHITE)
+        .label_font(("sans-serif", 32))
+        .draw()?;
+
+    root.present()?;
+    Ok(())
+}
+
+fn generate_g2_plot(path: &Path, result: &DLSResult) -> anyhow::Result<()> {
+    let root = BitMapBackend::new(path, (1600, 800)).into_drawing_area();
+    root.fill(&WHITE)?;
+
+    let data_sim: Vec<(f64, f64)> = result
+        .tau
+        .iter()
+        .zip(&result.g2_numeric_noisy)
+        .filter(|(tau, _)| **tau > 1e-10)
+        .map(|(tau, g2)| (tau.log10(), *g2))
+        .collect();
+    let data_theory: Vec<(f64, f64)> = result
+        .tau_theory
+        .iter()
+        .zip(&result.g2_theory)
+        .filter(|(tau, _)| **tau > 1e-10)
+        .map(|(tau, g2)| (tau.log10(), *g2))
+        .collect();
+
+    let min_x = data_sim
+        .iter()
+        .map(|&(x, _)| x)
+        .fold(f64::INFINITY, f64::min)
+        .min(
+            data_theory
+                .iter()
+                .map(|&(x, _)| x)
+                .fold(f64::INFINITY, f64::min),
+        );
+    let max_x = data_sim
+        .iter()
+        .map(|&(x, _)| x)
+        .fold(f64::NEG_INFINITY, f64::max)
+        .max(
+            data_theory
+                .iter()
+                .map(|&(x, _)| x)
+                .fold(f64::NEG_INFINITY, f64::max),
+        );
+    let min_y = data_sim
+        .iter()
+        .chain(&data_theory)
+        .map(|&(_, y)| y)
+        .fold(f64::INFINITY, f64::min);
+    let max_y = data_sim
+        .iter()
+        .chain(&data_theory)
+        .map(|&(_, y)| y)
+        .fold(f64::NEG_INFINITY, f64::max);
+
+    let mut chart = ChartBuilder::on(&root)
+        .caption(
+            "Intensity Autocorrelation Function g_2(T)",
+            ("sans-serif", 64),
+        )
+        .margin(5)
+        .x_label_area_size(40)
+        .y_label_area_size(50)
+        .build_cartesian_2d(min_x..max_x, min_y..max_y)?;
+
+    chart
+        .configure_mesh()
+        .x_desc("log10(T) [s]")
+        .y_desc("g_2(T)")
+        .draw()?;
+
+    chart
+        .draw_series(LineSeries::new(data_sim, BLUE.stroke_width(4)))?
+        .label("Simulated")
+        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], &BLUE));
+    chart
+        .draw_series(LineSeries::new(data_theory, GREEN.stroke_width(4)))?
+        .label("Theoretical")
+        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], &GREEN));
+
+    chart
+        .configure_series_labels()
+        .label_font(("sans-serif", 32))
+        .background_style(&WHITE)
+        .draw()?;
+
+    root.present()?;
+    Ok(())
+}
+
+fn generate_size_plot(path: &Path, result: &DLSResult) -> anyhow::Result<()> {
+    let root = BitMapBackend::new(path, (1600, 800)).into_drawing_area();
+    root.fill(&WHITE)?;
+
+    let min_x = result
+        .size_nm
+        .iter()
+        .cloned()
+        .fold(f64::INFINITY, f64::min)
+        .min(
+            result
+                .size_num_nm
+                .iter()
+                .cloned()
+                .fold(f64::INFINITY, f64::min),
+        );
+    let max_x = result
+        .size_nm
+        .iter()
+        .cloned()
+        .fold(f64::NEG_INFINITY, f64::max)
+        .max(
+            result
+                .size_num_nm
+                .iter()
+                .cloned()
+                .fold(f64::NEG_INFINITY, f64::max),
+        );
+    let min_y = result
+        .size_intensity
+        .iter()
+        .cloned()
+        .fold(f64::INFINITY, f64::min)
+        .min(
+            result
+                .size_num_dist
+                .iter()
+                .cloned()
+                .fold(f64::INFINITY, f64::min),
+        );
+    let max_y = result
+        .size_intensity
+        .iter()
+        .cloned()
+        .fold(f64::NEG_INFINITY, f64::max)
+        .max(
+            result
+                .size_num_dist
+                .iter()
+                .cloned()
+                .fold(f64::NEG_INFINITY, f64::max),
+        );
+
+    let mut chart = ChartBuilder::on(&root)
+        .caption("Particle Size Distribution", ("sans-serif", 64))
+        .margin(5)
+        .x_label_area_size(40)
+        .y_label_area_size(50)
+        .build_cartesian_2d(min_x..max_x, min_y..max_y)?;
+
+    chart
+        .configure_mesh()
+        .x_desc("Size (nm)")
+        .y_desc("Relative Distribution")
+        .draw()?;
+
+    chart
+        .draw_series(LineSeries::new(
+            result
+                .size_nm
+                .iter()
+                .zip(&result.size_intensity)
+                .map(|(&x, &y)| (x, y)),
+            GREEN.stroke_width(4),
+        ))?
+        .label("Intensity")
+        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], &GREEN));
+
+    chart
+        .draw_series(LineSeries::new(
+            result
+                .size_num_nm
+                .iter()
+                .zip(&result.size_num_dist)
+                .map(|(&x, &y)| (x, y)),
+            BLUE.stroke_width(4),
+        ))?
+        .label("Number")
+        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], &BLUE));
+
+    chart
+        .configure_series_labels()
+        .background_style(&WHITE)
+        .label_font(("sans-serif", 32))
+        .draw()?;
+
+    root.present()?;
     Ok(())
 }
