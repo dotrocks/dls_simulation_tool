@@ -24,4 +24,5 @@ target
 font/*.ttf
 
 # Ignore generated reports
-*.pdf
+sim_output/*
+!sim_output/README.md

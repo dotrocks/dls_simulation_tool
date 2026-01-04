@@ -1,4 +1,6 @@
 use crate::structs::{DLSResult, SimulationParams};
+use chrono::Utc;
+use csv;
 use genpdf::Element;
 use genpdf::{Alignment, elements, style};
 use opener;
@@ -450,5 +452,115 @@ fn generate_size_plot(path: &Path, result: &DLSResult) -> anyhow::Result<()> {
         .draw()?;
 
     root.present()?;
+    Ok(())
+}
+
+pub fn export_csv(
+    dir_path: &str,
+    _params: &SimulationParams,
+    result: &DLSResult,
+) -> anyhow::Result<()> {
+    use std::path::Path;
+
+    let dir = Path::new(dir_path);
+
+    {
+        let default_name = format!(
+            "particle_size_distribution_{}.csv",
+            Utc::now().format("%Y-%m-%d_%H-%M-%S")
+        );
+        let path = dir.join(default_name);
+        let mut wtr = csv::Writer::from_path(path)?;
+        wtr.write_record(&["Size (nm)", "Intensity Distribution", "Number Distribution"])?;
+        let max_len = result.size_nm.len().max(result.size_num_nm.len());
+        for i in 0..max_len {
+            let size_nm = if i < result.size_nm.len() {
+                result.size_nm[i].to_string()
+            } else {
+                "".to_string()
+            };
+            let intensity = if i < result.size_intensity.len() {
+                result.size_intensity[i].to_string()
+            } else {
+                "".to_string()
+            };
+            let num_dist = if i < result.size_num_dist.len() {
+                result.size_num_dist[i].to_string()
+            } else {
+                "".to_string()
+            };
+            wtr.write_record(&[size_nm, intensity, num_dist])?;
+        }
+        wtr.flush()?;
+    }
+
+    {
+        let default_name = format!("g2_tau_{}.csv", Utc::now().format("%Y-%m-%d_%H-%M-%S"));
+        let path = dir.join(default_name);
+        let mut wtr = csv::Writer::from_path(path)?;
+        wtr.write_record(&["Tau (s)", "g2 Numeric Noisy", "g2 Theory"])?;
+        for i in 0..result.tau.len() {
+            wtr.write_record(&[
+                result.tau[i].to_string(),
+                result.g2_numeric_noisy[i].to_string(),
+                result.g2_theory[i].to_string(),
+            ])?;
+        }
+        wtr.flush()?;
+    }
+
+    {
+        let default_name = format!("g1_tau_{}.csv", Utc::now().format("%Y-%m-%d_%H-%M-%S"));
+        let path = dir.join(default_name);
+        let mut wtr = csv::Writer::from_path(path)?;
+        wtr.write_record(&["Tau (s)", "g1 Numeric Ideal", "g1 Theory"])?;
+        for i in 0..result.tau.len() {
+            wtr.write_record(&[
+                result.tau[i].to_string(),
+                result.g1_numeric_ideal[i].to_string(),
+                result.g1_theory[i].to_string(),
+            ])?;
+        }
+        wtr.flush()?;
+    }
+
+    {
+        let default_name = format!("intensity_{}.csv", Utc::now().format("%Y-%m-%d_%H-%M-%S"));
+        let path = dir.join(default_name);
+        let mut wtr = csv::Writer::from_path(path)?;
+        wtr.write_record(&[
+            "Time (s)",
+            "Intensity Ideal (a.u.)",
+            "Intensity Noisy (a.u.)",
+        ])?;
+        for i in 0..result.time.len() {
+            wtr.write_record(&[
+                result.time[i].to_string(),
+                result.intensity_ideal[i].to_string(),
+                result.intensity_noisy[i].to_string(),
+            ])?;
+        }
+        wtr.flush()?;
+    }
+
+    {
+        let default_name = format!(
+            "raw_particle_sizes_{}.csv",
+            Utc::now().format("%Y-%m-%d_%H-%M-%S")
+        );
+        let path = dir.join(default_name);
+        let mut wtr = csv::Writer::from_path(path)?;
+        wtr.write_record(&["Particle Size (nm)", "Intensity Weight"])?;
+        for i in 0..result.raw_sizes_nm.len() {
+            let weight = if i < result.intensity_weights.len() {
+                result.intensity_weights[i].to_string()
+            } else {
+                "".to_string()
+            };
+            wtr.write_record(&[result.raw_sizes_nm[i].to_string(), weight])?;
+        }
+        wtr.flush()?;
+    }
+
     Ok(())
 }

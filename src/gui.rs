@@ -1,3 +1,4 @@
+use crate::report::export_csv;
 use crate::report::export_pdf;
 use crate::{
     simulation::simulate,
@@ -268,6 +269,22 @@ impl eframe::App for DLSApp {
                                 export_pdf(&path.to_string_lossy(), &self.params, results)
                             {
                                 eprintln!("PDF export error: {err}");
+                            }
+                        }
+                    }
+
+                    if ui
+                        .add_sized(
+                            [ui.available_width(), 24.0],
+                            egui::Button::new("Export CSVs").small(),
+                        )
+                        .clicked()
+                    {
+                        if let Some(path) = rfd::FileDialog::new().pick_folder() {
+                            if let Err(err) =
+                                export_csv(&path.to_string_lossy(), &self.params, results)
+                            {
+                                eprintln!("CSV export error: {err}");
                             }
                         }
                     }
